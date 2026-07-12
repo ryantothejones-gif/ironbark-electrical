@@ -62,6 +62,16 @@ you:
 | `/casino fulfill <n>` | Clear a redemption from the queue |
 | `/casino reset confirm` | Wipe all points, redemptions and logs |
 
+## Announcing to everyone (not just your party)
+By default announcements go to **party** chat. Switch with
+`/casino channel say` (everyone nearby), `yell` (bigger radius), or `guild`.
+
+Note: Blizzard blocks addons from auto-sending `/say` and `/yell` in the open
+world - a real click is required. When you use say/yell outside an instance,
+CasinoHost queues each announcement on a big **"Announce: ..."** button at the
+top of your screen; one click sends it. (Right-click-drag moves the button.)
+Party/raid/guild/custom channels always send instantly.
+
 ## Tip
 Turn on **dry-run** (`/casino dryrun on`) to try everything solo - announcements
 print only to your own chat so you can rehearse before going live.

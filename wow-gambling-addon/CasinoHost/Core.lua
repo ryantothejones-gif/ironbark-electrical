@@ -55,6 +55,48 @@ end
 -- ---------------------------------------------------------------------------
 -- Announce to the configured channel (or print locally in dry-run mode)
 -- ---------------------------------------------------------------------------
+-- SAY/YELL are protected in the open world on retail: an addon can only send
+-- them from a hardware event (a real click). So outside instances we queue the
+-- message on a big button the host clicks to fire it.
+local sayQueue = {}
+local sayButton
+
+local function updateSayButton()
+  if not sayButton then return end
+  local nextMsg = sayQueue[1]
+  if not nextMsg then
+    sayButton:Hide()
+    return
+  end
+  local extra = #sayQueue > 1 and string.format("  (+%d more)", #sayQueue - 1) or ""
+  sayButton:SetText("Announce: " .. nextMsg.msg .. extra)
+  sayButton:SetWidth(math.min(600, sayButton:GetFontString():GetStringWidth() + 40))
+  sayButton:Show()
+end
+
+local function queueSay(msg, ch)
+  if not sayButton then
+    local b = CreateFrame("Button", "CasinoHostAnnounceButton", UIParent, "UIPanelButtonTemplate")
+    b:SetSize(300, 30)
+    b:SetPoint("TOP", UIParent, "TOP", 0, -160)
+    b:SetFrameStrata("DIALOG")
+    b:SetClampedToScreen(true)
+    b:SetMovable(true)
+    b:RegisterForDrag("RightButton")
+    b:SetScript("OnDragStart", b.StartMoving)
+    b:SetScript("OnDragStop", b.StopMovingOrSizing)
+    b:SetScript("OnClick", function()
+      -- This click IS the hardware event, so say/yell is allowed here.
+      local item = table.remove(sayQueue, 1)
+      if item then SendChatMessage(item.msg, item.ch) end
+      updateSayButton()
+    end)
+    sayButton = b
+  end
+  table.insert(sayQueue, { msg = msg, ch = ch })
+  updateSayButton()
+end
+
 function ns:Announce(msg)
   local db = self.db
   if not db or db.dryRun then
@@ -69,6 +111,10 @@ function ns:Announce(msg)
       return
     end
     self:Print("Channel '" .. db.channelName .. "' not joined - showing locally: " .. msg)
+    return
+  end
+  if (ch == "SAY" or ch == "YELL") and not IsInInstance() then
+    queueSay(msg, ch)
     return
   end
   SendChatMessage(msg, ch)
