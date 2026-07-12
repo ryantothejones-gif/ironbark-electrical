@@ -12,6 +12,7 @@ local TABS = {
   { key = "points", label = "Points" },
   { key = "redeem", label = "Redeem" },
   { key = "bets",   label = "Bets" },
+  { key = "pl",     label = "P&L" },
 }
 
 -- ---------------------------------------------------------------------------
@@ -80,11 +81,35 @@ local function betsContent()
   return out
 end
 
+local function plContent()
+  local out = header()
+  local s = ns.db.session
+  out = out .. string.format("|cff33ff99Session|r (since %s)\nIn: %s   Out: %s   Net: %s\n\n",
+    s.started ~= "" and s.started or "?",
+    ns:GoldStr(s.bets), ns:GoldStr(s.payouts), ns:SignedGold(s.bets - s.payouts))
+
+  local bets, payouts = ns.Ledger:Summary()
+  out = out .. string.format("|cff33ff99All-time|r\nIn: %s   Out: %s   Net: %s\n\n",
+    ns:GoldStr(bets), ns:GoldStr(payouts), ns:SignedGold(bets - payouts))
+
+  local list = {}
+  for _, e in pairs(ns.db.ledger) do table.insert(list, e) end
+  if #list == 0 then return out .. "No trades logged yet." end
+  table.sort(list, function(a, b) return (a.bets - a.payouts) > (b.bets - b.payouts) end)
+  out = out .. "|cff33ff99Per player|r (house net vs them)\n"
+  for _, e in ipairs(list) do
+    out = out .. string.format("%s - bet %s, paid %s, net %s  (%d bets)\n",
+      e.display, ns:GoldStr(e.bets), ns:GoldStr(e.payouts), ns:SignedGold(e.bets - e.payouts), e.count or 0)
+  end
+  return out
+end
+
 local builders = {
   bj = bjContent,
   points = pointsContent,
   redeem = redeemContent,
   bets = betsContent,
+  pl = plContent,
 }
 
 -- ---------------------------------------------------------------------------
@@ -94,7 +119,7 @@ local function build()
   if UI.frame then return end
 
   local f = CreateFrame("Frame", "CasinoHostFrame", UIParent, "BackdropTemplate")
-  f:SetSize(440, 500)
+  f:SetSize(530, 500)
   f:SetPoint("CENTER")
   f:SetBackdrop({
     bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
@@ -141,12 +166,12 @@ local function build()
   scroll:SetPoint("BOTTOMRIGHT", -34, 52)
 
   local child = CreateFrame("Frame", nil, scroll)
-  child:SetSize(380, 1)
+  child:SetSize(470, 1)
   scroll:SetScrollChild(child)
 
   local content = child:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
   content:SetPoint("TOPLEFT", 0, 0)
-  content:SetWidth(380)
+  content:SetWidth(470)
   content:SetJustifyH("LEFT")
   content:SetJustifyV("TOP")
   UI.content = content

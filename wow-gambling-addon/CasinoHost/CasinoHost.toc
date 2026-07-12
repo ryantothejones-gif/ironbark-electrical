@@ -8,6 +8,7 @@
 
 Core.lua
 RollParser.lua
+Ledger.lua
 Trade.lua
 Blackjack.lua
 Points.lua

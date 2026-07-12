@@ -45,28 +45,48 @@ ns:On("TRADE_CLOSED", function()
 end)
 
 function T:Complete(info)
-  local copper = info.theyGive or 0
+  local betCopper = info.theyGive or 0
+  local payCopper = info.iGive or 0
   local name = info.partner
-  if not name or name == "" or name == UNKNOWN then name = "Someone" end
+  local known = name and name ~= "" and name ~= UNKNOWN
+  if not known then name = "Someone" end
 
-  if copper <= 0 then
-    -- No incoming gold: this was a payout or item-only trade. Nothing to announce.
+  -- Gold YOU handed over = a payout. Log it against the player's P&L.
+  if payCopper > 0 and known then
+    ns.Ledger:AddPayout(name, payCopper)
+    ns:Print(string.format("Payout logged: %s to %s.", ns:GoldStr(payCopper), ns:Short(name)))
+  end
+
+  if betCopper <= 0 then
+    -- No incoming gold: payout-only or item-only trade. Nothing to announce.
+    if payCopper > 0 and ns.UI then ns.UI:Refresh() end
     return
   end
 
-  local gold = math.floor(copper / 10000)
-  ns:Announce(string.format("%s just bet %s!", ns:Short(name), ns:GoldStr(copper)))
+  local gold = math.floor(betCopper / 10000)
+  ns:Announce(string.format("%s just bet %s!", ns:Short(name), ns:GoldStr(betCopper)))
 
   table.insert(ns.db.betLog, {
     player = ns:Norm(name),
     display = ns:Short(name),
-    copper = copper,
+    copper = betCopper,
     time = date("%Y-%m-%d %H:%M"),
   })
+  if known then
+    ns.Ledger:AddBet(name, betCopper)
+  end
 
   local pts, total = ns.Points:AwardForBet(name, gold)
   if pts and pts > 0 then
-    ns:Print(string.format("%s bet %s -> +%d points (total %d).", ns:Short(name), ns:GoldStr(copper), pts, total))
+    ns:Print(string.format("%s bet %s -> +%d points (total %d).", ns:Short(name), ns:GoldStr(betCopper), pts, total))
+  end
+
+  -- Let the player know their new balance right away.
+  if known then
+    SendChatMessage(string.format(
+      "Bet received: %s (+%d points). Balance: %d points. Whisper !redeem <amount> to cash in.",
+      ns:GoldStr(betCopper), pts or 0, total or ns.Points:Get(name)),
+      "WHISPER", nil, ns:Norm(name))
   end
 
   if ns.UI then ns.UI:Refresh() end

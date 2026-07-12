@@ -12,8 +12,10 @@ everyone to see:
 
 > **Bob just bet 500g!**
 
-No macro needed - it reads the trade automatically and awards the player points for
-the bet.
+No macro needed - it reads the trade automatically, awards the player points for
+the bet, and **whispers them their new points balance** right away:
+
+> Bet received: 500g (+500 points). Balance: 1250 points. Whisper !redeem &lt;amount&gt; to cash in.
 
 ### 2. Roll blackjack (target 100)
 Players `/roll` (1-100) in the party. Each roll adds to their running total; get as
@@ -34,6 +36,13 @@ you:
 - `!balance` -> *"You have 500 point(s)."*
 - `!redeem 100` -> deducts points and adds a redemption to your queue to fulfil.
 - `!help` -> lists the commands.
+
+### 4. Trade logger / P&L
+Every gold trade is logged both ways: gold coming **in** (bets) and gold going
+**out** (payouts you trade back). The **P&L** tab shows session and all-time
+profit, plus a per-player breakdown of who's up and who's down against the house.
+`/casino session reset` zeroes the session counter at the start of a hosting
+night; paid someone by mail instead of trade? `/casino payout <name> <gold>`.
 
 ## Install
 1. Copy the `CasinoHost` folder into
@@ -58,6 +67,9 @@ you:
 | `/casino points [name]` | Show a balance or the leaderboard |
 | `/casino give <name> <points>` | Manually adjust points |
 | `/casino bet <name> <gold>` | Manually log a bet (if you didn't trade) |
+| `/casino pl` | Print session + all-time profit/loss |
+| `/casino session [reset]` | Show session P&L, or start a new session |
+| `/casino payout <name> <gold>` | Manually log a payout (mail, COD, etc.) |
 | `/casino redemptions` | List pending redemptions |
 | `/casino fulfill <n>` | Clear a redemption from the queue |
 | `/casino reset confirm` | Wipe all points, redemptions and logs |
@@ -77,6 +89,6 @@ Turn on **dry-run** (`/casino dryrun on`) to try everything solo - announcements
 print only to your own chat so you can rehearse before going live.
 
 ## Status
-First working version. Trade announcer, blackjack, and points/redemptions are all
-implemented. Ideas for later: deathroll, coinflip/dice side games, and a
-per-player session P/L report.
+Trade announcer (with auto balance whisper), blackjack, points/redemptions, and
+the P&L trade logger are all implemented. Ideas for later: deathroll and
+coinflip/dice side games.
