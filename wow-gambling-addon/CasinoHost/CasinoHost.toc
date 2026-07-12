@@ -1,0 +1,14 @@
+## Interface: 110200
+## Title: CasinoHost
+## Notes: Host tool for gold gambling - trade-bet announcer, roll blackjack, and a points/redemption system.
+## Author: ryantothejones
+## Version: 0.1.0
+## SavedVariables: CasinoHostDB
+## IconTexture: Interface\Icons\INV_Misc_Coin_01
+
+Core.lua
+RollParser.lua
+Trade.lua
+Blackjack.lua
+Points.lua
+UI.lua
