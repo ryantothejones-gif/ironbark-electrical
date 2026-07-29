@@ -188,6 +188,8 @@ local defaults = {
   dryRun = false,           -- print announcements locally instead of sending
   pointsPerGold = 1,        -- points awarded per 1 gold bet
   target = 100,             -- blackjack target number
+  bjAuto = true,            -- auto-call the blackjack result once every player is done
+  bjAutoDelay = 3,          -- grace seconds before the auto-result fires (any roll cancels it)
   points = {},              -- [Name-Realm] = points
   redemptions = {},         -- queue of { player, display, amount, time }
   betLog = {},              -- history of { player, display, copper, time }

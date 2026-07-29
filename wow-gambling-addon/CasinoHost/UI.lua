@@ -31,7 +31,8 @@ local function bjContent()
   local BJ = ns.BJ
   local out = header()
   out = out .. (BJ.active and "|cff00ff00Round is OPEN|r" or "|cffff8800Round closed|r")
-  out = out .. "  (target " .. (ns.db.target or 100) .. ")\n\n"
+  out = out .. "  (target " .. (ns.db.target or 100) .. ", auto-result "
+    .. (ns.db.bjAuto and "|cff00ff00on|r" or "off") .. ")\n\n"
   if BJ.tiebreak then
     out = out .. string.format("|cffffcc00ROLL-OFF|r (tied at %s) - Result forces it if someone bails\n", tostring(BJ.tiebreak.total or "?"))
     for _, key in ipairs(BJ.tiebreak.order) do

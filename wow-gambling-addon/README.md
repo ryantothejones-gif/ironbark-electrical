@@ -23,7 +23,9 @@ Trading gold **to** a player announces the win too:
 
 ### 2. Roll blackjack (target 100)
 Players `/roll` (1-100) in the party. Each roll adds to their running total; get as
-close to **100** as you can. Over 100 = **bust**. Type `stand` in chat to hold.
+close to **100** as you can. Over 100 = **bust**. Say `stand` (or `stay`/`s`/`hold`)
+in chat to hold. Once everyone has stood or busted the winner is called
+automatically after a couple of seconds (toggle with `/casino bj auto on|off`).
 
 CasinoHost narrates the whole thing:
 
@@ -82,6 +84,7 @@ night; paid someone by mail instead of trade? `/casino payout <name> <gold>`.
 | `/casino bj start` | Open a blackjack round |
 | `/casino bj stop` | Close the round (no more rolls) |
 | `/casino bj result` | Announce the winner (roll-off on ties) and open the next round |
+| `/casino bj auto <on\|off>` | Auto-call the winner when everyone's done (default on) |
 | `/casino bj clear` | Clear the table |
 | `/casino uo <on\|off>` | Under/Over 7 dice game (toss your Worn Troll Dice) |
 | `/casino channel <party\|say\|yell\|emote\|raid\|guild\|channel NAME>` | Where BIG announcements go (bets, payouts, winners) |

@@ -16,6 +16,7 @@ function BJ:Clear()
   self.players = {}
   self.order = {}
   self.tiebreak = nil
+  self.autoToken = (self.autoToken or 0) + 1 -- cancel any pending auto-result
   if ns.UI then ns.UI:Refresh() end
 end
 
@@ -36,7 +37,7 @@ function BJ:Start()
   self.active = true
   local target = ns.db.target or 100
   ns:Announce(string.format(
-    "Blackjack is OPEN! /roll (1-%d) to hit, keep rolling to get close to %d. Type 'stand' to hold - over %d and you BUST!",
+    "Blackjack is OPEN! /roll (1-%d) to hit, keep rolling to get close to %d. Say 'stand' (or stay/s) to hold - over %d and you BUST!",
     target, target, target))
   if ns.UI then ns.UI:Refresh() end
 end
@@ -44,6 +45,7 @@ end
 function BJ:Stop()
   self.active = false
   self.tiebreak = nil
+  self.autoToken = (self.autoToken or 0) + 1 -- cancel any pending auto-result
   ns:Announce("Blackjack round closed - no more rolls.")
   if ns.UI then ns.UI:Refresh() end
 end
@@ -82,6 +84,7 @@ function BJ:AddRoll(name, value)
   end
 
   if ns.UI then ns.UI:Refresh() end
+  self:MaybeAutoResult()
 end
 
 function BJ:Stand(name)
@@ -92,9 +95,11 @@ function BJ:Stand(name)
   p.status = "stand"
   ns:Announce(string.format("%s stands on %d.", p.display, p.total))
   if ns.UI then ns.UI:Refresh() end
+  self:MaybeAutoResult()
 end
 
 function BJ:Result()
+  self.autoToken = (self.autoToken or 0) + 1 -- a result (manual or auto) cancels any other pending auto-result
   -- During a roll-off, /casino bj result force-resolves it (no-shows forfeit).
   if self.tiebreak then
     self:ResolveTiebreak(true)
@@ -239,6 +244,49 @@ function BJ:ResolveTiebreak(force)
 end
 
 -- ---------------------------------------------------------------------------
+-- Auto-result: once every player who has rolled is done (stood or busted),
+-- call the round automatically after a short grace window. ANY new roll cancels
+-- the pending call (via the generation token), so a player who is still deciding
+-- - or a latecomer who only just joined - is never cut off. Toggle with
+-- /casino bj auto on|off.
+-- ---------------------------------------------------------------------------
+local function everyoneDone()
+  local anyPlayer, allDone = false, true
+  for _, key in ipairs(BJ.order) do
+    local p = BJ.players[key]
+    if p.rolls > 0 then
+      anyPlayer = true
+      if p.status == "playing" then allDone = false end
+    end
+  end
+  return anyPlayer and allDone
+end
+
+function BJ:MaybeAutoResult()
+  -- Any table activity invalidates a previously-scheduled auto-result.
+  self.autoToken = (self.autoToken or 0) + 1
+  if not self.active or self.tiebreak or not ns.db.bjAuto then return end
+  if not everyoneDone() then return end
+
+  local myToken = self.autoToken
+  local function fire()
+    -- Re-check at fire time: still armed, still this generation, still all done
+    -- (nobody rejoined or is mid-decision), and there is someone to judge.
+    if self.active and not self.tiebreak and ns.db.bjAuto
+       and self.autoToken == myToken and everyoneDone() then
+      self:Result()
+    end
+  end
+
+  local delay = ns.db.bjAutoDelay or 3
+  if C_Timer and C_Timer.After then
+    C_Timer.After(delay, fire)
+  else
+    fire()
+  end
+end
+
+-- ---------------------------------------------------------------------------
 -- Wire up rolls and "stand" detection
 -- ---------------------------------------------------------------------------
 ns:OnRoll(function(self, who, roll, low, high)
@@ -254,10 +302,18 @@ ns:OnRoll(function(self, who, roll, low, high)
   end
 end)
 
+-- Words a player can say (in party/raid/say) to hold their hand.
+local STAND_WORDS = {
+  ["stand"] = true, ["!stand"] = true,
+  ["stay"]  = true, ["!stay"]  = true,
+  ["hold"]  = true, ["!hold"]  = true,
+  ["s"]     = true, ["!s"]     = true,
+}
+
 local function checkStand(self, text, sender)
   if not BJ.active or BJ.tiebreak or not text then return end
   local t = text:lower():gsub("^%s+", ""):gsub("%s+$", "")
-  if t == "stand" or t == "!stand" then
+  if STAND_WORDS[t] then
     BJ:Stand(sender)
   end
 end
@@ -271,7 +327,7 @@ ns:On("CHAT_MSG_SAY", checkStand)
 -- ---------------------------------------------------------------------------
 -- Command
 -- ---------------------------------------------------------------------------
-ns:AddCommand("bj", "start | stop | result | clear - result announces the winner and opens the next round", function(self, rest)
+ns:AddCommand("bj", "start | stop | result | clear | auto on|off - result announces the winner and opens the next round", function(self, rest)
   local sub = (rest or ""):lower():match("^(%S*)")
   if sub == "" or sub == "start" then
     BJ:Start()
@@ -283,7 +339,19 @@ ns:AddCommand("bj", "start | stop | result | clear - result announces the winner
     BJ.active = false
     BJ:Clear()
     self:Print("Blackjack table cleared.")
+  elseif sub == "auto" then
+    local v = (rest or ""):lower():match("^%S+%s+(%S+)")
+    if v == "on" then
+      self.db.bjAuto = true
+      self:Print("Blackjack auto-result |cff00ff00ON|r - the round calls itself once everyone has stood or busted.")
+    elseif v == "off" then
+      self.db.bjAuto = false
+      self:Print("Blackjack auto-result |cffff0000OFF|r - press Result (or the button) yourself.")
+    else
+      self:Print("Blackjack auto-result is " .. (self.db.bjAuto and "ON" or "OFF") .. ". Use: /casino bj auto on|off")
+    end
+    if ns.UI then ns.UI:Refresh() end
   else
-    self:Print("Usage: /casino bj start|stop|result|clear")
+    self:Print("Usage: /casino bj start|stop|result|clear|auto on|off")
   end
 end)
