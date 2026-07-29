@@ -67,6 +67,11 @@ local function uoContent()
   else
     out = out .. "No toss yet.\n"
   end
+  local recent = UO:RecentString(10)
+  if recent then
+    out = out .. "|cff33ff99Recent|r (newest first): " .. recent .. "\n"
+    out = out .. "|cff808080Players can whisper you !dice for this list.|r\n"
+  end
   if UO.active and #UO.pending == 1 then
     out = out .. "\n|cffff8800Got the first die - waiting for the second...|r\n"
   end

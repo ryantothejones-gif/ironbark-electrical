@@ -302,11 +302,13 @@ ns:OnRoll(function(self, who, roll, low, high)
   end
 end)
 
--- Words a player can say (in party/raid/say) to hold their hand.
+-- Words a player can say (in party/raid/say) to hold their hand. Kept short and
+-- unambiguous: "hold" was dropped because it collides with common raid chatter
+-- ("hold", "hold dps") and would stand a live player - and with auto-result on,
+-- one stray word could end the round early.
 local STAND_WORDS = {
   ["stand"] = true, ["!stand"] = true,
   ["stay"]  = true, ["!stay"]  = true,
-  ["hold"]  = true, ["!hold"]  = true,
   ["s"]     = true, ["!s"]     = true,
 }
 
@@ -344,6 +346,8 @@ ns:AddCommand("bj", "start | stop | result | clear | auto on|off - result announ
     if v == "on" then
       self.db.bjAuto = true
       self:Print("Blackjack auto-result |cff00ff00ON|r - the round calls itself once everyone has stood or busted.")
+      BJ:MaybeAutoResult() -- re-arm now in case the table is already finished
+
     elseif v == "off" then
       self.db.bjAuto = false
       self:Print("Blackjack auto-result |cffff0000OFF|r - press Result (or the button) yourself.")

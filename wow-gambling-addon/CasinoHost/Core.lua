@@ -193,6 +193,7 @@ local defaults = {
   points = {},              -- [Name-Realm] = points
   redemptions = {},         -- queue of { player, display, amount, time }
   betLog = {},              -- history of { player, display, copper, time }
+  uoHistory = {},           -- rolling list of recent Under/Over 7 totals
   ledger = {},              -- [Name-Realm] = { display, bets, payouts, count } (copper)
   session = { bets = 0, payouts = 0, started = "" },
   minimap = { hide = false, angle = 220 },
@@ -434,6 +435,7 @@ ns:AddCommand("reset", "wipe all points, redemptions & logs (add 'confirm')", fu
   self.db.redemptions = {}
   self.db.betLog = {}
   self.db.ledger = {}
+  self.db.uoHistory = {}
   self.db.session = { bets = 0, payouts = 0, started = date("%Y-%m-%d %H:%M") }
   self:Print("All data wiped.")
   if ns.UI then ns.UI:Refresh() end

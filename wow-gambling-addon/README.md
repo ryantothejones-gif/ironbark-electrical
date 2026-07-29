@@ -23,7 +23,7 @@ Trading gold **to** a player announces the win too:
 
 ### 2. Roll blackjack (target 100)
 Players `/roll` (1-100) in the party. Each roll adds to their running total; get as
-close to **100** as you can. Over 100 = **bust**. Say `stand` (or `stay`/`s`/`hold`)
+close to **100** as you can. Over 100 = **bust**. Say `stand` (or `stay`/`s`)
 in chat to hold. Once everyone has stood or busted the winner is called
 automatically after a couple of seconds (toggle with `/casino bj auto on|off`).
 
@@ -59,6 +59,7 @@ you:
 
 - `!balance` -> *"You have 500 point(s)."*
 - `!redeem 100` -> deducts points and adds a redemption to your queue to fulfil.
+- `!dice` -> the last 10 Under/Over 7 results, newest first (`!history`/`!rolls`/`!7` also work).
 - `!help` -> lists the commands.
 
 ### 5. Trade logger / P&L

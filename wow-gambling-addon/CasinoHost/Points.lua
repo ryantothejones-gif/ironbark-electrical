@@ -69,7 +69,17 @@ local function handleWhisper(self, text, sender)
   end
 
   if low == "!help" then
-    ns:SendChat("Commands: !balance = check points | !redeem <amount> = spend points", "WHISPER", nil, sender)
+    ns:SendChat("Commands: !balance = check points | !redeem <amount> = spend points | !dice = recent Under/Over 7 rolls", "WHISPER", nil, sender)
+    return
+  end
+
+  if low == "!dice" or low == "!history" or low == "!rolls" or low == "!7" then
+    local recent = ns.UO and ns.UO:RecentString(10)
+    if recent then
+      ns:SendChat("Last Under/Over 7 (newest first): " .. recent, "WHISPER", nil, sender)
+    else
+      ns:SendChat("No Under/Over 7 dice results yet.", "WHISPER", nil, sender)
+    end
     return
   end
 

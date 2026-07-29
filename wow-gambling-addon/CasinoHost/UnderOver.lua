@@ -107,8 +107,29 @@ function UO:Settle(a, b)
     verdict = "OVER 7!"
   end
   self.last = { a = a, b = b, total = total, verdict = verdict }
+
+  -- Rolling history (persisted) so players can whisper !dice for recent results.
+  ns.db.uoHistory = ns.db.uoHistory or {}
+  table.insert(ns.db.uoHistory, total)
+  while #ns.db.uoHistory > 20 do table.remove(ns.db.uoHistory, 1) end
+
   ns:Announce(string.format("Dice: %d + %d = %d - %s", a, b, total, verdict), "hype")
   if ns.UI then ns.UI:Refresh() end
+end
+
+-- Compact "newest first" summary of the last `count` results (nil if none).
+-- e.g. "11 over, 7 SEVEN, 5 under"
+function UO:RecentString(count)
+  local h = ns.db.uoHistory
+  if not h or #h == 0 then return nil end
+  count = count or 10
+  local parts = {}
+  for i = #h, math.max(1, #h - count + 1), -1 do
+    local total = h[i]
+    local mark = (total == 7 and "SEVEN") or (total < 7 and "under") or "over"
+    table.insert(parts, total .. " " .. mark)
+  end
+  return table.concat(parts, ", ")
 end
 
 -- ---------------------------------------------------------------------------
@@ -135,13 +156,16 @@ end)
 -- ---------------------------------------------------------------------------
 -- Command
 -- ---------------------------------------------------------------------------
-ns:AddCommand("uo", "on | off - Under/Over 7 dice game (toss your Worn Troll Dice)", function(self, rest)
+ns:AddCommand("uo", "on | off | history - Under/Over 7 dice game (toss your Worn Troll Dice)", function(self, rest)
   local sub = (rest or ""):lower():match("^(%S*)")
   if sub == "on" or sub == "start" or sub == "" then
     UO:Start()
   elseif sub == "off" or sub == "stop" then
     UO:Stop()
+  elseif sub == "history" or sub == "last" or sub == "rolls" then
+    local s = UO:RecentString(10)
+    self:Print(s and ("Last 10 Under/Over 7 (newest first): " .. s) or "No dice results yet.")
   else
-    self:Print("Usage: /casino uo on|off  (then toss your Worn Troll Dice)")
+    self:Print("Usage: /casino uo on|off|history  (then toss your Worn Troll Dice)")
   end
 end)
