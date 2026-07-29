@@ -119,7 +119,9 @@ function ns:Announce(msg)
     self:Print("Channel '" .. db.channelName .. "' not joined - showing locally: " .. msg)
     return
   end
-  if (ch == "SAY" or ch == "YELL") and not IsInInstance() then
+  -- SAY/YELL always need a click; in Midnight (12.0+) instances block addon
+  -- chat sends entirely, so never try to auto-send these.
+  if ch == "SAY" or ch == "YELL" then
     queueSay(msg, ch)
     return
   end
