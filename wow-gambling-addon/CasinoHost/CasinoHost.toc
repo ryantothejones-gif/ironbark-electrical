@@ -2,7 +2,7 @@
 ## Title: CasinoHost
 ## Notes: Host tool for gold gambling - trade-bet announcer, roll blackjack, and a points/redemption system.
 ## Author: ryantothejones
-## Version: 0.2.0
+## Version: 0.3.0
 ## SavedVariables: CasinoHostDB
 ## IconTexture: Interface\Icons\INV_Misc_Coin_01
 

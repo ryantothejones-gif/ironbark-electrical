@@ -72,7 +72,8 @@ night; paid someone by mail instead of trade? `/casino payout <name> <gold>`.
 | `/casino bj stop` | Close the round (no more rolls) |
 | `/casino bj result` | Announce the winner (roll-off on ties) and open the next round |
 | `/casino bj clear` | Clear the table |
-| `/casino channel <party\|say\|raid\|guild\|yell\|channel NAME>` | Where to announce |
+| `/casino channel <party\|say\|raid\|guild\|yell\|channel NAME>` | Where BIG announcements go (bets, payouts, winners) |
+| `/casino gamechat <party\|say\|raid\|guild\|yell\|off>` | Where play-by-play goes (rolls, round opens, roll-offs) |
 | `/casino bindkey <key\|off>` | Keybind that fires the Announce button (e.g. `F8`) |
 | `/casino target <n>` | Blackjack target number (default 100) |
 | `/casino rate <n>` | Points per gold bet |
@@ -88,8 +89,15 @@ night; paid someone by mail instead of trade? `/casino payout <name> <gold>`.
 | `/casino reset confirm` | Wipe all points, redemptions and logs |
 
 ## Announcing to everyone (not just your party)
-By default announcements go to **party** chat. Switch with
-`/casino channel say` (everyone nearby), `yell` (bigger radius), or `guild`.
+Announcements are split into two streams, each with its own channel:
+
+- **Big announcements** (bets, payouts, blackjack winners): `/casino channel say`
+- **Play-by-play** (rolls, busts, round opens, roll-off mechanics):
+  `/casino gamechat party` (or `off` to keep it host-only)
+
+The classic casino setup is `channel say` + `gamechat party`: the crowd hears
+the money and the winners; the table hears the game. Both are also click-to-cycle
+buttons in the window ("Bets:" / "Game:").
 
 Note: Blizzard blocks addons from auto-sending `/say` and `/yell` - a real
 hardware event (mouse click or keypress) is required. When you use say/yell,

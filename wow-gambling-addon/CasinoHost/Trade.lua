@@ -58,7 +58,7 @@ function T:Complete(info)
     -- Only a payout-ONLY trade is a win worth shouting about; gold both ways
     -- is making change on a bet, and announcing that as a WINNER would lie.
     if betCopper <= 0 then
-      ns:Announce(string.format("WINNER! %s takes home %s!", ns:Short(name), ns:GoldStr(payCopper)))
+      ns:Announce(string.format("WINNER! %s takes home %s!", ns:Short(name), ns:GoldStr(payCopper)), "hype")
     end
   end
 
@@ -69,7 +69,7 @@ function T:Complete(info)
   end
 
   local gold = math.floor(betCopper / 10000)
-  ns:Announce(string.format("%s just bet %s!", ns:Short(name), ns:GoldStr(betCopper)))
+  ns:Announce(string.format("%s just bet %s!", ns:Short(name), ns:GoldStr(betCopper)), "hype")
 
   table.insert(ns.db.betLog, {
     player = ns:Norm(name),

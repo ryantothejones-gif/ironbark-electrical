@@ -123,9 +123,9 @@ function BJ:Result()
   end
 
   if #winners == 0 then
-    ns:Announce("Everyone busted - house wins!")
+    ns:Announce("Everyone busted - house wins!", "hype")
   elseif #winners == 1 then
-    ns:Announce(string.format("%s wins with %d!", winners[1].p.display, best))
+    ns:Announce(string.format("%s wins with %d!", winners[1].p.display, best), "hype")
   else
     -- Tie: winner decided by a roll-off, not a shrug.
     self:StartTiebreak(winners, best)
@@ -221,7 +221,7 @@ function BJ:ResolveTiebreak(force)
   end
 
   if #top == 1 then
-    ns:Announce(string.format("%s wins the roll-off with %d!", top[1].p.display, best))
+    ns:Announce(string.format("%s wins the roll-off with %d!", top[1].p.display, best), "hype")
     self.tiebreak = nil
     self:NextRound()
   else

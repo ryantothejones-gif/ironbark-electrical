@@ -142,13 +142,24 @@ local function queueSay(msg, ch)
   updateSayButton()
 end
 
-function ns:Announce(msg)
+-- class "hype" = the big moments (bets, payouts, winners) -> db.channel.
+-- anything else = table play-by-play (rolls, round opens, roll-offs) -> db.tableChannel.
+function ns:Announce(msg, class)
   local db = self.db
   if not db or db.dryRun then
     self:Print("|cffffcc00[dry-run]|r " .. msg)
     return
   end
-  local ch = db.channel or "PARTY"
+  local ch
+  if class == "hype" then
+    ch = db.channel or "PARTY"
+  else
+    ch = db.tableChannel or "PARTY"
+  end
+  if ch == "OFF" then
+    self:Print("|cff888888[quiet]|r " .. msg)
+    return
+  end
   if ch == "CHANNEL" and db.channelName then
     local id = GetChannelName(db.channelName)
     if id and id > 0 then
@@ -171,8 +182,9 @@ end
 -- Saved-variable defaults
 -- ---------------------------------------------------------------------------
 local defaults = {
-  channel = "PARTY",       -- SAY / YELL / PARTY / RAID / GUILD / INSTANCE_CHAT / CHANNEL
+  channel = "PARTY",       -- big announcements: SAY / YELL / PARTY / RAID / GUILD / INSTANCE_CHAT / CHANNEL
   channelName = nil,        -- custom channel name when channel == "CHANNEL"
+  tableChannel = "PARTY",   -- play-by-play: PARTY / SAY / YELL / RAID / GUILD / OFF
   dryRun = false,           -- print announcements locally instead of sending
   pointsPerGold = 1,        -- points awarded per 1 gold bet
   target = 100,             -- blackjack target number
@@ -286,7 +298,7 @@ end
 -- ---------------------------------------------------------------------------
 -- Configuration / management commands
 -- ---------------------------------------------------------------------------
-ns:AddCommand("channel", "<party|say|raid|guild|yell|channel NAME> - where to announce", function(self, rest)
+ns:AddCommand("channel", "<party|say|raid|guild|yell|channel NAME> - where BIG announcements go (bets, payouts, winners)", function(self, rest)
   local a, b = rest:match("^(%S+)%s*(.-)$")
   a = a and a:upper() or ""
   local valid = { SAY = true, YELL = true, PARTY = true, RAID = true, GUILD = true, INSTANCE_CHAT = true }
@@ -303,6 +315,20 @@ ns:AddCommand("channel", "<party|say|raid|guild|yell|channel NAME> - where to an
     self:Print("Current: " .. (self.db.channel == "CHANNEL" and ("channel " .. (self.db.channelName or "?")) or self.db.channel))
     self:Print("Valid: party, say, raid, guild, yell, channel <name>")
   end
+end)
+
+ns:AddCommand("gamechat", "<party|say|raid|guild|yell|off> - where play-by-play goes (rolls, round opens, roll-offs)", function(self, rest)
+  local a = rest:match("^(%S*)")
+  a = a and a:upper() or ""
+  local valid = { SAY = true, YELL = true, PARTY = true, RAID = true, GUILD = true, INSTANCE_CHAT = true, OFF = true }
+  if valid[a] then
+    self.db.tableChannel = a
+    self:Print("Play-by-play going to " .. (a == "OFF" and "nowhere (host-only prints)" or a))
+  else
+    self:Print("Current play-by-play channel: " .. (self.db.tableChannel or "PARTY"))
+    self:Print("Valid: party, say, raid, guild, yell, off")
+  end
+  if ns.UI then ns.UI:Refresh() end
 end)
 
 ns:AddCommand("rate", "<n> - points awarded per 1 gold bet", function(self, rest)
@@ -370,7 +396,7 @@ ns:AddCommand("bet", "<name> <gold> - manually log a bet (if you didn't trade)",
   local name, gold = rest:match("^(%S+)%s+(%d+)$")
   if not name then self:Print("Usage: /casino bet <name> <gold>") return end
   gold = tonumber(gold)
-  self:Announce(string.format("%s just bet %s!", self:Short(name), self:GoldStr(gold * 10000)))
+  self:Announce(string.format("%s just bet %s!", self:Short(name), self:GoldStr(gold * 10000)), "hype")
   ns.Ledger:AddBet(name, gold * 10000)
   local pts, total = ns.Points:AwardForBet(name, gold)
   table.insert(self.db.betLog, { player = self:Norm(name), display = self:Short(name), copper = gold * 10000, time = date("%Y-%m-%d %H:%M") })

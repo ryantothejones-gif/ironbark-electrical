@@ -20,10 +20,10 @@ local TABS = {
 -- ---------------------------------------------------------------------------
 local function header()
   local db = ns.db
-  local ch = db.channel == "CHANNEL" and ("channel:" .. (db.channelName or "?")) or db.channel
+  local hype = db.channel == "CHANNEL" and ("channel:" .. (db.channelName or "?")) or db.channel
   return string.format(
-    "|cff33ff99Channel:|r %s   |cff33ff99Rate:|r %d/g   |cff33ff99Dry-run:|r %s\n\n",
-    ch, db.pointsPerGold, db.dryRun and "|cff00ff00ON|r" or "OFF")
+    "|cff33ff99Bets/winners:|r %s   |cff33ff99Game:|r %s   |cff33ff99Rate:|r %d/g   |cff33ff99Dry-run:|r %s\n\n",
+    hype, db.tableChannel or "PARTY", db.pointsPerGold, db.dryRun and "|cff00ff00ON|r" or "OFF")
 end
 
 local function bjContent()
@@ -171,7 +171,7 @@ local function build()
   -- Scrolling content
   local scroll = CreateFrame("ScrollFrame", "CasinoHostScroll", f, "UIPanelScrollFrameTemplate")
   scroll:SetPoint("TOPLEFT", 16, -76)
-  scroll:SetPoint("BOTTOMRIGHT", -34, 52)
+  scroll:SetPoint("BOTTOMRIGHT", -34, 80)
 
   local child = CreateFrame("Frame", nil, scroll)
   child:SetSize(470, 1)
@@ -185,16 +185,21 @@ local function build()
   UI.content = content
   UI.child = child
 
-  -- Action buttons along the bottom
-  local function actionButton(text, width, anchor, onClick)
+  -- Action buttons along the bottom (two rows)
+  local function actionButton(text, width, anchor, onClick, row)
     local b = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
     b:SetSize(width, 24)
     b:SetText(text)
-    b:SetPoint("BOTTOMLEFT", anchor and anchor or f, anchor and "BOTTOMRIGHT" or "BOTTOMLEFT", anchor and 4 or 16, anchor and 0 or 16)
+    if anchor then
+      b:SetPoint("LEFT", anchor, "RIGHT", 4, 0)
+    else
+      b:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 16, row == 2 and 44 or 16)
+    end
     b:SetScript("OnClick", onClick)
     return b
   end
 
+  -- Row 1: blackjack round control
   local bStart = actionButton("Start", 70, nil, function() ns.BJ:Start() end)
   local bStop = actionButton("Stop", 60, bStart, function() ns.BJ:Stop() end)
   local bResult = actionButton("Result", 70, bStop, function() ns.BJ:Result() end)
@@ -204,10 +209,48 @@ local function build()
     ns:Print("Dry-run " .. (ns.db.dryRun and "ON" or "OFF"))
     UI:Refresh()
   end)
+
+  -- Row 2: channel routing + host chores (click to cycle channels)
+  local HYPE_CYCLE = { "SAY", "YELL", "PARTY", "RAID", "GUILD" }
+  local GAME_CYCLE = { "PARTY", "RAID", "GUILD", "SAY", "YELL", "OFF" }
+  local function cycle(list, current)
+    for i, v in ipairs(list) do
+      if v == current then return list[(i % #list) + 1] end
+    end
+    return list[1]
+  end
+
+  UI.hypeBtn = actionButton("Bets: ?", 110, nil, function()
+    ns.db.channel = cycle(HYPE_CYCLE, ns.db.channel)
+    ns.db.channelName = nil
+    ns:Print("Big announcements (bets/payouts/winners) now go to " .. ns.db.channel)
+    UI:Refresh()
+  end, 2)
+  UI.gameBtn = actionButton("Game: ?", 110, UI.hypeBtn, function()
+    ns.db.tableChannel = cycle(GAME_CYCLE, ns.db.tableChannel or "PARTY")
+    ns:Print("Play-by-play now goes to " .. ns.db.tableChannel)
+    UI:Refresh()
+  end)
+  local bFulfill = actionButton("Fulfill #1", 90, UI.gameBtn, function()
+    local r = ns.db.redemptions
+    if #r == 0 then ns:Print("No pending redemptions.") return end
+    local e = table.remove(r, 1)
+    ns:Print(string.format("Fulfilled: %s - %d pts.", e.display or e.player, e.amount))
+    UI:Refresh()
+  end)
+  local bSession = actionButton("New session", 100, bFulfill, function()
+    ns.db.session = { bets = 0, payouts = 0, started = date("%Y-%m-%d %H:%M") }
+    ns:Print("New session started - session P&L zeroed (all-time ledger kept).")
+    UI:Refresh()
+  end)
 end
 
 function UI:Refresh()
   if not self.frame or not self.frame:IsShown() then return end
+  if self.hypeBtn then
+    self.hypeBtn:SetText("Bets: " .. (ns.db.channel == "CHANNEL" and "CUSTOM" or (ns.db.channel or "PARTY")))
+    self.gameBtn:SetText("Game: " .. (ns.db.tableChannel or "PARTY"))
+  end
   -- highlight active tab
   for key, b in pairs(self.tabButtons) do
     if key == self.tab then b:LockHighlight() else b:UnlockHighlight() end
