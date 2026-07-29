@@ -78,7 +78,7 @@ local function uoContent()
     out = out .. string.format("\n|cff33ff99Point bets|r (7 pays %d:1, pool %d):\n", ns.db.uoSevenPays or 4, pool)
     for _, l in ipairs(lines) do out = out .. "  " .. l .. "\n" end
   elseif UO.active then
-    out = out .. "\n|cff808080No point bets yet - players whisper !bet <amount> <over|under|7>.|r\n"
+    out = out .. "\n|cff808080No point bets yet - players whisper !bet <amount> <over/under/7>.|r\n"
   end
   if UO.active and #UO.pending == 1 then
     out = out .. "\n|cffff8800Got the first die - waiting for the second...|r\n"

@@ -120,7 +120,7 @@ function UO:Settle(a, b)
 end
 
 -- ---------------------------------------------------------------------------
--- Point betting: players whisper !bet <amount> <over|under|7>. Their points are
+-- Point betting: players whisper !bet <amount> <over/under/7>. Their points are
 -- staked at once; the next real toss settles it. Over/under pay even money; a
 -- straight 7 pays db.uoSevenPays:1 (default 4). The house edge lives in the fact
 -- that a 7 loses BOTH over and under. !cancelbet refunds before the toss, and
@@ -142,9 +142,15 @@ function UO:PlaceBet(sender, amount, choiceWord)
     ns:SendChat("Under/Over 7 isn't open right now - wait for the host to open it.", "WHISPER", nil, sender)
     return
   end
+  if #self.pending >= 1 then
+    -- A toss is mid-flight (a die is already showing publicly); freeze betting
+    -- so nobody can bet with partial knowledge of the result.
+    ns:SendChat("Too late - the dice are rolling! Bet on the next toss.", "WHISPER", nil, sender)
+    return
+  end
   local choice = CHOICE_WORDS[(choiceWord or ""):lower()]
   if not amount or amount <= 0 or not choice then
-    ns:SendChat("Usage: !bet <amount> <over|under|7>  e.g. !bet 100 over", "WHISPER", nil, sender)
+    ns:SendChat("Usage: !bet <amount> <over/under/7>  e.g. !bet 100 over", "WHISPER", nil, sender)
     return
   end
   local key = ns:Norm(sender)
@@ -160,9 +166,12 @@ function UO:PlaceBet(sender, amount, choiceWord)
     ns:SendChat(string.format("Not enough points - you have %d, tried to bet %d. (Bet gold with me to earn points.)", bal, amount), "WHISPER", nil, sender)
     return
   end
+  -- Build the bet, THEN deduct, THEN store, so a failure can't leave a player's
+  -- stake gone with no recorded bet.
+  local bet = { display = ns:Short(sender), amount = amount, choice = choice }
   ns.Points:Add(sender, -amount)
-  ns.db.uoBets[key] = { display = ns:Short(sender), amount = amount, choice = choice }
-  ns:SendChat(string.format("Bet placed: %d on %s. Balance: %d. Good luck!", amount, choiceLabel(choice), ns.Points:Get(sender)), "WHISPER", nil, sender)
+  ns.db.uoBets[key] = bet
+  pcall(ns.SendChat, ns, string.format("Bet placed: %d on %s. Balance: %d. Good luck!", amount, choiceLabel(choice), ns.Points:Get(sender)), "WHISPER", nil, sender)
   ns:Print(string.format("|cffffcc00BET|r %s put %d points on %s.", ns:Short(sender), amount, choiceLabel(choice)))
   if ns.UI then ns.UI:Refresh() end
 end
@@ -182,20 +191,20 @@ function UO:CancelBet(sender)
 end
 
 function UO:RefundBets(reason)
-  if not ns.db.uoBets then return end
-  local any = false
-  for key, b in pairs(ns.db.uoBets) do
+  local bets = ns.db.uoBets
+  if not bets or not next(bets) then return end
+  ns.db.uoBets = {} -- clear before refunding so a failed whisper can't double-refund
+  for key, b in pairs(bets) do
     ns.Points:Add(key, b.amount)
-    ns:SendChat(string.format("Under/Over 7 %s - your %d point bet was refunded.", reason or "closed", b.amount), "WHISPER", nil, key)
-    any = true
+    pcall(ns.SendChat, ns, string.format("Under/Over 7 %s - your %d point bet was refunded.", reason or "closed", b.amount), "WHISPER", nil, key)
   end
-  ns.db.uoBets = {}
-  if any and ns.UI then ns.UI:Refresh() end
+  if ns.UI then ns.UI:Refresh() end
 end
 
 function UO:SettleBets(total)
   local bets = ns.db.uoBets
   if not bets or not next(bets) then return end
+  ns.db.uoBets = {} -- clear BEFORE paying so a failed whisper can't re-pay next toss
   local winning = (total == 7 and "seven") or (total < 7 and "under") or "over"
   local sevenPays = ns.db.uoSevenPays or 4
   local names, winners, paid = {}, 0, 0
@@ -207,14 +216,13 @@ function UO:SettleBets(total)
       winners = winners + 1
       paid = paid + profit
       table.insert(names, b.display)
-      ns:SendChat(string.format("YOU WON! %s hit - +%d points (bet %d). Balance: %d.",
+      pcall(ns.SendChat, ns, string.format("YOU WON! %s hit - +%d points (bet %d). Balance: %d.",
         choiceLabel(winning), profit, b.amount, newbal), "WHISPER", nil, key)
     else
-      ns:SendChat(string.format("No luck - it was %s, you had %s. Lost %d. Balance: %d.",
+      pcall(ns.SendChat, ns, string.format("No luck - it was %s, you had %s. Lost %d. Balance: %d.",
         choiceLabel(winning), choiceLabel(b.choice), b.amount, ns.Points:Get(key)), "WHISPER", nil, key)
     end
   end
-  ns.db.uoBets = {}
   if winners > 0 then
     ns:Announce(string.format("Point bets: %d winner(s) - %s - paid %d points!", winners, table.concat(names, ", "), paid), "hype")
   else
@@ -273,7 +281,7 @@ end)
 -- ---------------------------------------------------------------------------
 -- Command
 -- ---------------------------------------------------------------------------
-ns:AddCommand("uo", "on | off | history | pays <n> - Under/Over 7 dice (players whisper !bet <amount> <over|under|7>)", function(self, rest)
+ns:AddCommand("uo", "on | off | history | pays <n> - Under/Over 7 dice (players whisper !bet <amount> <over/under/7>)", function(self, rest)
   local sub = (rest or ""):lower():match("^(%S*)")
   if sub == "on" or sub == "start" or sub == "" then
     UO:Start()
@@ -292,5 +300,18 @@ ns:AddCommand("uo", "on | off | history | pays <n> - Under/Over 7 dice (players 
     end
   else
     self:Print("Usage: /casino uo on|off|history|pays <n>  (then toss your Worn Troll Dice)")
+  end
+end)
+
+-- Refund any bets left in the DB from a previous session (a logout or reload
+-- instead of /casino uo off). The game always comes up inactive, so these would
+-- otherwise settle against an unrelated future toss.
+ns:OnReady(function()
+  local bets = ns.db.uoBets
+  if bets and next(bets) then
+    local n = 0
+    for key, b in pairs(bets) do ns.Points:Add(key, b.amount); n = n + 1 end
+    ns.db.uoBets = {}
+    ns:Print(string.format("Refunded %d leftover Under/Over 7 point bet(s) from a previous session.", n))
   end
 end)

@@ -69,7 +69,7 @@ local function handleWhisper(self, text, sender)
   end
 
   if low == "!help" then
-    ns:SendChat("Commands: !balance = points | !bet <amount> <over|under|7> = bet points on the dice | !cancelbet | !dice = recent rolls | !redeem <amount> = cash in points", "WHISPER", nil, sender)
+    ns:SendChat("Commands: !balance (points), !bet <amount> <over/under/7> (bet points on the dice), !cancelbet, !dice (recent rolls), !redeem <amount> (cash in points)", "WHISPER", nil, sender)
     return
   end
 
@@ -79,7 +79,7 @@ local function handleWhisper(self, text, sender)
     return
   end
   if low:match("^!bet") then
-    ns:SendChat("Usage: !bet <amount> <over|under|7>  e.g. !bet 100 over", "WHISPER", nil, sender)
+    ns:SendChat("Usage: !bet <amount> <over/under/7>  e.g. !bet 100 over", "WHISPER", nil, sender)
     return
   end
 
