@@ -47,6 +47,7 @@ function UO:Stop()
   self.active = false
   self.pending = {}
   self.token = self.token + 1
+  self:RefundBets("closed")
   ns:Announce("Under/Over 7 is closed - no more bets.", "table")
   if ns.UI then ns.UI:Refresh() end
 end
@@ -114,7 +115,123 @@ function UO:Settle(a, b)
   while #ns.db.uoHistory > 20 do table.remove(ns.db.uoHistory, 1) end
 
   ns:Announce(string.format("Dice: %d + %d = %d - %s", a, b, total, verdict), "hype")
+  self:SettleBets(total)
   if ns.UI then ns.UI:Refresh() end
+end
+
+-- ---------------------------------------------------------------------------
+-- Point betting: players whisper !bet <amount> <over|under|7>. Their points are
+-- staked at once; the next real toss settles it. Over/under pay even money; a
+-- straight 7 pays db.uoSevenPays:1 (default 4). The house edge lives in the fact
+-- that a 7 loses BOTH over and under. !cancelbet refunds before the toss, and
+-- stopping the game refunds every pending bet.
+-- ---------------------------------------------------------------------------
+local CHOICE_WORDS = {
+  over = "over", o = "over", high = "over",
+  under = "under", u = "under", low = "under",
+  seven = "seven", ["7"] = "seven",
+}
+
+local function choiceLabel(c)
+  if c == "seven" then return "SEVEN (7)" end
+  return c:upper()
+end
+
+function UO:PlaceBet(sender, amount, choiceWord)
+  if not self.active then
+    ns:SendChat("Under/Over 7 isn't open right now - wait for the host to open it.", "WHISPER", nil, sender)
+    return
+  end
+  local choice = CHOICE_WORDS[(choiceWord or ""):lower()]
+  if not amount or amount <= 0 or not choice then
+    ns:SendChat("Usage: !bet <amount> <over|under|7>  e.g. !bet 100 over", "WHISPER", nil, sender)
+    return
+  end
+  local key = ns:Norm(sender)
+  ns.db.uoBets = ns.db.uoBets or {}
+  local existing = ns.db.uoBets[key]
+  if existing then
+    ns:SendChat(string.format("You already have %d on %s this toss. Whisper !cancelbet to change it.",
+      existing.amount, choiceLabel(existing.choice)), "WHISPER", nil, sender)
+    return
+  end
+  local bal = ns.Points:Get(sender)
+  if bal < amount then
+    ns:SendChat(string.format("Not enough points - you have %d, tried to bet %d. (Bet gold with me to earn points.)", bal, amount), "WHISPER", nil, sender)
+    return
+  end
+  ns.Points:Add(sender, -amount)
+  ns.db.uoBets[key] = { display = ns:Short(sender), amount = amount, choice = choice }
+  ns:SendChat(string.format("Bet placed: %d on %s. Balance: %d. Good luck!", amount, choiceLabel(choice), ns.Points:Get(sender)), "WHISPER", nil, sender)
+  ns:Print(string.format("|cffffcc00BET|r %s put %d points on %s.", ns:Short(sender), amount, choiceLabel(choice)))
+  if ns.UI then ns.UI:Refresh() end
+end
+
+function UO:CancelBet(sender)
+  local key = ns:Norm(sender)
+  local b = ns.db.uoBets and ns.db.uoBets[key]
+  if not b then
+    ns:SendChat("You have no pending Under/Over 7 bet.", "WHISPER", nil, sender)
+    return
+  end
+  ns.Points:Add(key, b.amount)
+  ns.db.uoBets[key] = nil
+  ns:SendChat(string.format("Bet cancelled - %d points refunded. Balance: %d.", b.amount, ns.Points:Get(key)), "WHISPER", nil, sender)
+  ns:Print(string.format("%s cancelled their %d point bet.", b.display, b.amount))
+  if ns.UI then ns.UI:Refresh() end
+end
+
+function UO:RefundBets(reason)
+  if not ns.db.uoBets then return end
+  local any = false
+  for key, b in pairs(ns.db.uoBets) do
+    ns.Points:Add(key, b.amount)
+    ns:SendChat(string.format("Under/Over 7 %s - your %d point bet was refunded.", reason or "closed", b.amount), "WHISPER", nil, key)
+    any = true
+  end
+  ns.db.uoBets = {}
+  if any and ns.UI then ns.UI:Refresh() end
+end
+
+function UO:SettleBets(total)
+  local bets = ns.db.uoBets
+  if not bets or not next(bets) then return end
+  local winning = (total == 7 and "seven") or (total < 7 and "under") or "over"
+  local sevenPays = ns.db.uoSevenPays or 4
+  local names, winners, paid = {}, 0, 0
+  for key, b in pairs(bets) do
+    if b.choice == winning then
+      local ratio = (b.choice == "seven") and sevenPays or 1
+      local profit = b.amount * ratio
+      local newbal = ns.Points:Add(key, b.amount + profit) -- stake back + winnings
+      winners = winners + 1
+      paid = paid + profit
+      table.insert(names, b.display)
+      ns:SendChat(string.format("YOU WON! %s hit - +%d points (bet %d). Balance: %d.",
+        choiceLabel(winning), profit, b.amount, newbal), "WHISPER", nil, key)
+    else
+      ns:SendChat(string.format("No luck - it was %s, you had %s. Lost %d. Balance: %d.",
+        choiceLabel(winning), choiceLabel(b.choice), b.amount, ns.Points:Get(key)), "WHISPER", nil, key)
+    end
+  end
+  ns.db.uoBets = {}
+  if winners > 0 then
+    ns:Announce(string.format("Point bets: %d winner(s) - %s - paid %d points!", winners, table.concat(names, ", "), paid), "hype")
+  else
+    ns:Announce("Point bets: no winners - the house keeps the lot!", "hype")
+  end
+end
+
+-- Compact pending-bet summary for the UI (nil if none).
+function UO:BetsSummary()
+  local bets = ns.db.uoBets
+  if not bets or not next(bets) then return nil end
+  local lines, pool = {}, 0
+  for _, b in pairs(bets) do
+    table.insert(lines, string.format("%s: %d on %s", b.display, b.amount, choiceLabel(b.choice)))
+    pool = pool + b.amount
+  end
+  return lines, pool
 end
 
 -- Compact "newest first" summary of the last `count` results (nil if none).
@@ -156,7 +273,7 @@ end)
 -- ---------------------------------------------------------------------------
 -- Command
 -- ---------------------------------------------------------------------------
-ns:AddCommand("uo", "on | off | history - Under/Over 7 dice game (toss your Worn Troll Dice)", function(self, rest)
+ns:AddCommand("uo", "on | off | history | pays <n> - Under/Over 7 dice (players whisper !bet <amount> <over|under|7>)", function(self, rest)
   local sub = (rest or ""):lower():match("^(%S*)")
   if sub == "on" or sub == "start" or sub == "" then
     UO:Start()
@@ -165,7 +282,15 @@ ns:AddCommand("uo", "on | off | history - Under/Over 7 dice game (toss your Worn
   elseif sub == "history" or sub == "last" or sub == "rolls" then
     local s = UO:RecentString(10)
     self:Print(s and ("Last 10 Under/Over 7 (newest first): " .. s) or "No dice results yet.")
+  elseif sub == "pays" then
+    local n = tonumber((rest or ""):match("^%S+%s+(%d+)"))
+    if n and n >= 1 then
+      self.db.uoSevenPays = n
+      self:Print("Under/Over 7: a straight '7' bet now pays " .. n .. ":1 (over/under pay even money).")
+    else
+      self:Print("A '7' bet pays " .. (self.db.uoSevenPays or 4) .. ":1. Set with /casino uo pays <n>")
+    end
   else
-    self:Print("Usage: /casino uo on|off|history  (then toss your Worn Troll Dice)")
+    self:Print("Usage: /casino uo on|off|history|pays <n>  (then toss your Worn Troll Dice)")
   end
 end)

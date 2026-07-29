@@ -49,9 +49,15 @@ them, and calls it for everyone:
 
 > Dice: 4 + 5 = 9 - OVER 7!
 
-Players bet UNDER (2-6), SEVEN (7), or OVER (8-12) by trading you gold like any
-other game, then you pay the winners. Only your own tosses count, and the game
-ignores stray rolls until you arm it.
+Players can bet two ways:
+- **With gold** - trade you gold like any other game, then you pay the winners.
+- **With points** - whisper `!bet <amount> <over|under|7>` (e.g. `!bet 100 over`).
+  Their points are staked instantly and the toss settles automatically:
+  over/under pay even money, a straight 7 pays 4:1 (`/casino uo pays <n>` to
+  change), and everyone is paid or charged in points with no action from you.
+  `!cancelbet` refunds before the toss; closing the game refunds all pending bets.
+
+Only your own tosses count, and the game ignores stray rolls until you arm it.
 
 ### 4. Points & redemptions
 Betting earns points (default: 1 point per gold bet, configurable). Players whisper
