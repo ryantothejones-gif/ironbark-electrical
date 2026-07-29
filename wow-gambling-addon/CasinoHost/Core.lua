@@ -58,12 +58,20 @@ function ns:SignedGold(copper)
   return "|cffff4040-" .. self:GoldStr(-copper) .. "|r"
 end
 
+-- The global SendChatMessage was deprecated in 11.2.0; prefer C_ChatInfo.
+function ns:SendChat(msg, chatType, language, target)
+  local send = (C_ChatInfo and C_ChatInfo.SendChatMessage) or SendChatMessage
+  send(msg, chatType, language, target)
+end
+
 -- ---------------------------------------------------------------------------
 -- Announce to the configured channel (or print locally in dry-run mode)
 -- ---------------------------------------------------------------------------
 -- SAY/YELL are protected in the open world on retail: an addon can only send
--- them from a hardware event (a real click). So outside instances we queue the
--- message on a big button the host clicks to fire it.
+-- them from a hardware event. A real mouse click on the button qualifies, and so
+-- does a CLICK keybind (SetOverrideBindingClick). A "/click Name" macro does NOT:
+-- it runs the handler on a non-hardware path, so the say/yell is silently eaten.
+-- That's why there is a /casino bindkey command instead of a macro.
 local sayQueue = {}
 local sayButton
 
@@ -80,25 +88,56 @@ local function updateSayButton()
   sayButton:Show()
 end
 
-local function queueSay(msg, ch)
-  if not sayButton then
-    local b = CreateFrame("Button", "CasinoHostAnnounceButton", UIParent, "UIPanelButtonTemplate")
-    b:SetSize(300, 30)
-    b:SetPoint("TOP", UIParent, "TOP", 0, -160)
-    b:SetFrameStrata("DIALOG")
-    b:SetClampedToScreen(true)
-    b:SetMovable(true)
-    b:RegisterForDrag("RightButton")
-    b:SetScript("OnDragStart", b.StartMoving)
-    b:SetScript("OnDragStop", b.StopMovingOrSizing)
-    b:SetScript("OnClick", function()
-      -- This click IS the hardware event, so say/yell is allowed here.
-      local item = table.remove(sayQueue, 1)
-      if item then SendChatMessage(item.msg, item.ch) end
-      updateSayButton()
-    end)
-    sayButton = b
+local function applyAnnounceBinding()
+  if not sayButton then return end
+  if InCombatLockdown and InCombatLockdown() then
+    ns.bindPending = true -- bindings are protected in combat; re-applied on PLAYER_REGEN_ENABLED
+    return
   end
+  ClearOverrideBindings(sayButton)
+  local key = ns.db and ns.db.announceKey
+  if key and key ~= "" then
+    SetOverrideBindingClick(sayButton, false, key, "CasinoHostAnnounceButton", "LeftButton")
+  end
+end
+
+local function ensureSayButton()
+  if sayButton then return end
+  local b = CreateFrame("Button", "CasinoHostAnnounceButton", UIParent, "UIPanelButtonTemplate")
+  b:SetSize(300, 30)
+  b:SetPoint("TOP", UIParent, "TOP", 0, -160)
+  b:SetFrameStrata("DIALOG")
+  b:SetClampedToScreen(true)
+  b:SetMovable(true)
+  b:RegisterForDrag("RightButton")
+  b:SetScript("OnDragStart", b.StartMoving)
+  b:SetScript("OnDragStop", b.StopMovingOrSizing)
+  -- Key bindings deliver a click on the phase picked by the ActionButtonUseKeyDown
+  -- CVar (retail default: key DOWN), while the default click registration is
+  -- LeftButtonUp only - which would make the bindkey silently dead. Register both
+  -- phases and act on exactly the configured one.
+  b:RegisterForClicks("AnyDown", "AnyUp")
+  b:SetScript("OnClick", function(_, button, down)
+    if button ~= "LeftButton" then return end -- right button is the drag handle
+    local useDown = true
+    if C_CVar and C_CVar.GetCVarBool then
+      useDown = C_CVar.GetCVarBool("ActionButtonUseKeyDown")
+    elseif GetCVarBool then
+      useDown = GetCVarBool("ActionButtonUseKeyDown")
+    end
+    if (down == true) ~= (useDown == true) then return end
+    -- This click IS the hardware event (mouse, or the bindkey CLICK binding).
+    local item = table.remove(sayQueue, 1)
+    if item then ns:SendChat(item.msg, item.ch) end
+    updateSayButton()
+  end)
+  b:Hide()
+  sayButton = b
+  applyAnnounceBinding()
+end
+
+local function queueSay(msg, ch)
+  ensureSayButton()
   table.insert(sayQueue, { msg = msg, ch = ch })
   updateSayButton()
 end
@@ -113,7 +152,7 @@ function ns:Announce(msg)
   if ch == "CHANNEL" and db.channelName then
     local id = GetChannelName(db.channelName)
     if id and id > 0 then
-      SendChatMessage(msg, "CHANNEL", nil, id)
+      self:SendChat(msg, "CHANNEL", nil, id)
       return
     end
     self:Print("Channel '" .. db.channelName .. "' not joined - showing locally: " .. msg)
@@ -125,7 +164,7 @@ function ns:Announce(msg)
     queueSay(msg, ch)
     return
   end
-  SendChatMessage(msg, ch)
+  self:SendChat(msg, ch)
 end
 
 -- ---------------------------------------------------------------------------
@@ -276,6 +315,20 @@ ns:AddCommand("rate", "<n> - points awarded per 1 gold bet", function(self, rest
   self:Print("Points rate set to " .. n .. " per gold.")
 end)
 
+ns:AddCommand("target", "<n> - blackjack target number (default 100; low targets make ties easy)", function(self, rest)
+  local n = tonumber(rest)
+  if not n or n < 2 or n ~= math.floor(n) then
+    self:Print("Blackjack target: " .. (self.db.target or 100) .. ". Set with /casino target <n> (min 2).")
+    return
+  end
+  self.db.target = n
+  self:Print("Blackjack target set to " .. n .. ". Players /roll (1-" .. n .. ").")
+  if ns.BJ and ns.BJ.active then
+    self:Print("Heads up: you changed the target mid-round - /casino bj clear then start for a clean table.")
+  end
+  if ns.UI then ns.UI:Refresh() end
+end)
+
 ns:AddCommand("dryrun", "on|off - test announcements locally without spamming chat", function(self, rest)
   local v = rest:lower()
   if v == "on" then
@@ -358,6 +411,53 @@ ns:AddCommand("reset", "wipe all points, redemptions & logs (add 'confirm')", fu
   if ns.UI then ns.UI:Refresh() end
 end)
 
+ns:AddCommand("bindkey", "<key|off> - keybind that fires the Announce button, e.g. F8", function(self, rest)
+  rest = (rest or ""):gsub("^%s+", ""):gsub("%s+$", "")
+  if rest == "" then
+    self:Print("Announce keybind: " .. (self.db.announceKey or "none") .. ". Set with /casino bindkey F8 (or: off)")
+    return
+  end
+  if rest:lower() == "off" then
+    self.db.announceKey = nil
+  else
+    if rest:find("%s") then
+      self:Print("Keys with modifiers use dashes: SHIFT-F8, CTRL-ALT-F8. Try again.")
+      return
+    end
+    self.db.announceKey = rest:upper()
+  end
+  ensureSayButton()
+  applyAnnounceBinding()
+  if self.bindPending then
+    self:Print("Keybind change queued - it applies when you leave combat.")
+  elseif self.db.announceKey and GetBindingAction then
+    -- SetOverrideBindingClick fails silently on bad key names; catch that here.
+    local action = GetBindingAction(self.db.announceKey, true)
+    if action ~= "CLICK CasinoHostAnnounceButton:LeftButton" then
+      self:Print("'" .. self.db.announceKey .. "' doesn't look like a valid key name - binding NOT applied. Use names like F8, NUMPAD1, SHIFT-F8.")
+      self.db.announceKey = nil
+      applyAnnounceBinding()
+      return
+    end
+  end
+  self:Print("Announce keybind: " .. (self.db.announceKey or "none"))
+end)
+
 ns:AddCommand("ui", "open/close the window", function(self)
   if ns.UI then ns.UI:Toggle() else self:Print("UI not loaded.") end
+end)
+
+-- ---------------------------------------------------------------------------
+-- Post-login wiring (ns:On / ns:OnReady exist by this point in the file)
+-- ---------------------------------------------------------------------------
+-- Create the announce button at login so the bindkey works before the first queue.
+ns:OnReady(function()
+  ensureSayButton()
+end)
+
+ns:On("PLAYER_REGEN_ENABLED", function(self)
+  if self.bindPending then
+    self.bindPending = nil
+    applyAnnounceBinding()
+  end
 end)

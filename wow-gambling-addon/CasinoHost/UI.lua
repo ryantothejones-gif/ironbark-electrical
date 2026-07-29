@@ -31,7 +31,15 @@ local function bjContent()
   local out = header()
   out = out .. (BJ.active and "|cff00ff00Round is OPEN|r" or "|cffff8800Round closed|r")
   out = out .. "  (target " .. (ns.db.target or 100) .. ")\n\n"
-  if #BJ.order == 0 then
+  if BJ.tiebreak then
+    out = out .. string.format("|cffffcc00ROLL-OFF|r (tied at %s) - Result forces it if someone bails\n", tostring(BJ.tiebreak.total or "?"))
+    for _, key in ipairs(BJ.tiebreak.order) do
+      local p = BJ.tiebreak.players[key]
+      out = out .. string.format("  %s - %s\n", p.display, p.roll and tostring(p.roll) or "|cffff8800waiting...|r")
+    end
+    out = out .. "\n"
+  end
+  if #BJ.order == 0 and not BJ.tiebreak then
     return out .. "No rolls yet. Start with /casino bj start, then players /roll."
   end
   for _, key in ipairs(BJ.order) do

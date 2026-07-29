@@ -32,11 +32,11 @@ end
 function P:Redeem(sender, amt)
   local bal = self:Get(sender)
   if amt <= 0 then
-    SendChatMessage("Redeem amount must be a positive number, e.g. !redeem 50", "WHISPER", nil, sender)
+    ns:SendChat("Redeem amount must be a positive number, e.g. !redeem 50", "WHISPER", nil, sender)
     return
   end
   if bal < amt then
-    SendChatMessage(string.format("Not enough points - you have %d, tried to redeem %d.", bal, amt), "WHISPER", nil, sender)
+    ns:SendChat(string.format("Not enough points - you have %d, tried to redeem %d.", bal, amt), "WHISPER", nil, sender)
     return
   end
   self:Add(sender, -amt)
@@ -46,7 +46,7 @@ function P:Redeem(sender, amt)
     amount = amt,
     time = date("%Y-%m-%d %H:%M"),
   })
-  SendChatMessage(string.format("Redeemed %d points! Balance: %d. A host will sort you out shortly.", amt, self:Get(sender)), "WHISPER", nil, sender)
+  ns:SendChat(string.format("Redeemed %d points! Balance: %d. A host will sort you out shortly.", amt, self:Get(sender)), "WHISPER", nil, sender)
   ns:Print(string.format("|cffffcc00REDEEM|r %s wants to redeem %d points (balance now %d). See /casino redemptions.", ns:Short(sender), amt, self:Get(sender)))
   if RaidNotice_AddMessage and RaidWarningFrame then
     RaidNotice_AddMessage(RaidWarningFrame, string.format("%s redeemed %d points", ns:Short(sender), amt), ChatTypeInfo["RAID_WARNING"])
@@ -64,12 +64,12 @@ local function handleWhisper(self, text, sender)
   local low = t:lower()
 
   if low == "!balance" or low == "!points" or low == "!bal" then
-    SendChatMessage(string.format("You have %d point(s).", P:Get(sender)), "WHISPER", nil, sender)
+    ns:SendChat(string.format("You have %d point(s).", P:Get(sender)), "WHISPER", nil, sender)
     return
   end
 
   if low == "!help" then
-    SendChatMessage("Commands: !balance = check points | !redeem <amount> = spend points", "WHISPER", nil, sender)
+    ns:SendChat("Commands: !balance = check points | !redeem <amount> = spend points", "WHISPER", nil, sender)
     return
   end
 
@@ -80,7 +80,7 @@ local function handleWhisper(self, text, sender)
   end
 
   if low:match("^!redeem") then
-    SendChatMessage("Usage: !redeem <amount>  e.g. !redeem 100", "WHISPER", nil, sender)
+    ns:SendChat("Usage: !redeem <amount>  e.g. !redeem 100", "WHISPER", nil, sender)
   end
 end
 

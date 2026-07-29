@@ -55,10 +55,15 @@ function T:Complete(info)
   if payCopper > 0 and known then
     ns.Ledger:AddPayout(name, payCopper)
     ns:Print(string.format("Payout logged: %s to %s.", ns:GoldStr(payCopper), ns:Short(name)))
+    -- Only a payout-ONLY trade is a win worth shouting about; gold both ways
+    -- is making change on a bet, and announcing that as a WINNER would lie.
+    if betCopper <= 0 then
+      ns:Announce(string.format("WINNER! %s takes home %s!", ns:Short(name), ns:GoldStr(payCopper)))
+    end
   end
 
   if betCopper <= 0 then
-    -- No incoming gold: payout-only or item-only trade. Nothing to announce.
+    -- No incoming gold: payout-only or item-only trade. Win announce (if any) already queued above.
     if payCopper > 0 and ns.UI then ns.UI:Refresh() end
     return
   end
@@ -83,7 +88,7 @@ function T:Complete(info)
 
   -- Let the player know their new balance right away.
   if known then
-    SendChatMessage(string.format(
+    ns:SendChat(string.format(
       "Bet received: %s (+%d points). Balance: %d points. Whisper !redeem <amount> to cash in.",
       ns:GoldStr(betCopper), pts or 0, total or ns.Points:Get(name)),
       "WHISPER", nil, ns:Norm(name))
