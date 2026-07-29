@@ -24,13 +24,21 @@ local function isHost(name)
   if not name then return false end
   local me = UnitName and UnitName("player")
   if not me then return false end
-  return ns:Short(name) == ns:Short(me)
+  -- Match on FULL Name-Realm (like every other module): a same-named player on
+  -- a connected/other realm must NOT be mistaken for the host, or their /roll 6
+  -- would be counted as one of the host's dice.
+  return ns:Norm(name) == ns:Norm(me)
 end
 
 function UO:Start()
   self.active = true
   self.pending = {}
   self.token = self.token + 1
+  -- Both games read 1-6 rolls; if a target-6 blackjack table is live the host's
+  -- dice would feed it too. Warn rather than silently cross-contaminate.
+  if ns.BJ and ns.BJ.active and (ns.db.target or 100) == 6 then
+    ns:Print("|cffff8800Heads up:|r a blackjack round with target 6 is live - your dice tosses will also land on that table. Close it with /casino bj stop first.")
+  end
   ns:Announce("Under/Over 7 is OPEN! Bet UNDER (2-6), SEVEN (7), or OVER (8-12). I'll toss the dice!", "table")
   if ns.UI then ns.UI:Refresh() end
 end
@@ -51,6 +59,16 @@ end
 
 function UO:AddDie(value)
   if not self.active then return end
+  local now = (GetTime and GetTime()) or 0
+
+  -- A real toss lands its two dice in the same instant. If a lone die has been
+  -- pending for a while, it was a stray /roll 6 - drop it so it can't bridge
+  -- into a wrong pair with the next toss. Locale-independent (doesn't rely on
+  -- the English toss emote), so it protects non-enUS clients too.
+  if #self.pending == 1 and now > 0 and self.firstTime and (now - self.firstTime) > 2 then
+    self.pending = {}
+  end
+
   table.insert(self.pending, value)
 
   if #self.pending >= 2 then
@@ -62,8 +80,9 @@ function UO:AddDie(value)
     return
   end
 
-  -- Only one die so far. If a second never arrives (a lone stray /roll 6),
-  -- clear it after a few seconds so it doesn't pair with the next real toss.
+  -- Only one die so far. Remember when it arrived, and if a second never comes
+  -- (a lone stray /roll 6), clear it after a few seconds.
+  self.firstTime = now
   self.token = self.token + 1
   local myToken = self.token
   if C_Timer and C_Timer.After then
@@ -105,9 +124,10 @@ end)
 
 ns:On("CHAT_MSG_TEXT_EMOTE", function(self, text, author)
   if not UO.active or not text then return end
-  -- English-only substrings; harmless no-op on other locales (the pairing still
-  -- works, this just makes it more robust when the emote is present).
-  if text:find("Worn Troll Dice") and (author == nil or isHost(author)) then
+  -- Resync on the host's toss emote. "Worn Troll Dice" is the enUS name; the
+  -- item hyperlink ("Hitem:") is present in every locale, so matching either
+  -- makes the resync work regardless of client language.
+  if (text:find("Worn Troll Dice") or text:find("Hitem:")) and (author == nil or isHost(author)) then
     UO:Resync()
   end
 end)
