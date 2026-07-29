@@ -9,6 +9,7 @@ UI.tab = "bj"
 
 local TABS = {
   { key = "bj",     label = "Blackjack" },
+  { key = "uo",     label = "U/O 7" },
   { key = "points", label = "Points" },
   { key = "redeem", label = "Redeem" },
   { key = "bets",   label = "Bets" },
@@ -50,6 +51,26 @@ local function bjContent()
     elseif status == "stand" then colour = "|cff40ff40" end
     out = out .. string.format("%s%s|r - %d  (%d rolls, %s)\n", colour, p.display, p.total, p.rolls, status)
   end
+  return out
+end
+
+local function uoContent()
+  local UO = ns.UO
+  local out = header()
+  out = out .. (UO.active and "|cff00ff00Under/Over 7 is OPEN|r" or "|cffff8800Under/Over 7 is off|r") .. "\n\n"
+  out = out .. "Toss your |cffffff00Worn Troll Dice|r toy - the addon reads the two dice and calls it:\n"
+  out = out .. "  |cffff4040UNDER 7|r (2-6)    |cffffcc00SEVEN|r (7)    |cff40ff40OVER 7|r (8-12)\n\n"
+  if UO.last then
+    local L = UO.last
+    out = out .. string.format("Last toss: %d + %d = |cffffff00%d|r  (%s)\n", L.a, L.b, L.total, L.verdict)
+  else
+    out = out .. "No toss yet.\n"
+  end
+  if UO.active and #UO.pending == 1 then
+    out = out .. "\n|cffff8800Got the first die - waiting for the second...|r\n"
+  end
+  out = out .. "\nStart/stop with the |cffffff00U/O 7|r button below, or /casino uo on|off.\n"
+  out = out .. "Bets come in by trade like any game; toss, then pay the winners."
   return out
 end
 
@@ -114,6 +135,7 @@ end
 
 local builders = {
   bj = bjContent,
+  uo = uoContent,
   points = pointsContent,
   redeem = redeemContent,
   bets = betsContent,
@@ -127,7 +149,7 @@ local function build()
   if UI.frame then return end
 
   local f = CreateFrame("Frame", "CasinoHostFrame", UIParent, "BackdropTemplate")
-  f:SetSize(530, 500)
+  f:SetSize(560, 500)
   f:SetPoint("CENTER")
   f:SetBackdrop({
     bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
@@ -156,7 +178,7 @@ local function build()
   local prev
   for _, t in ipairs(TABS) do
     local b = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
-    b:SetSize(96, 22)
+    b:SetSize(84, 22)
     b:SetText(t.label)
     if prev then
       b:SetPoint("LEFT", prev, "RIGHT", 4, 0)
@@ -174,12 +196,12 @@ local function build()
   scroll:SetPoint("BOTTOMRIGHT", -34, 80)
 
   local child = CreateFrame("Frame", nil, scroll)
-  child:SetSize(470, 1)
+  child:SetSize(500, 1)
   scroll:SetScrollChild(child)
 
   local content = child:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
   content:SetPoint("TOPLEFT", 0, 0)
-  content:SetWidth(470)
+  content:SetWidth(500)
   content:SetJustifyH("LEFT")
   content:SetJustifyV("TOP")
   UI.content = content
@@ -211,8 +233,10 @@ local function build()
   end)
 
   -- Row 2: channel routing + host chores (click to cycle channels)
-  local HYPE_CYCLE = { "SAY", "YELL", "PARTY", "RAID", "GUILD" }
-  local GAME_CYCLE = { "PARTY", "RAID", "GUILD", "SAY", "YELL", "OFF" }
+  -- Play-by-play deliberately excludes SAY/YELL: those are click-gated, and
+  -- high-volume roll narration would pile onto the Announce button.
+  local HYPE_CYCLE = { "SAY", "YELL", "EMOTE", "PARTY", "RAID", "GUILD" }
+  local GAME_CYCLE = { "PARTY", "RAID", "GUILD", "OFF" }
   local function cycle(list, current)
     for i, v in ipairs(list) do
       if v == current then return list[(i % #list) + 1] end
@@ -221,9 +245,11 @@ local function build()
   end
 
   UI.hypeBtn = actionButton("Bets: ?", 110, nil, function()
+    local wasCustom = ns.db.channel == "CHANNEL"
     ns.db.channel = cycle(HYPE_CYCLE, ns.db.channel)
     ns.db.channelName = nil
-    ns:Print("Big announcements (bets/payouts/winners) now go to " .. ns.db.channel)
+    ns:Print("Big announcements (bets/payouts/winners) now go to " .. ns.db.channel
+      .. (wasCustom and " |cffff8800(custom channel cleared)|r" or ""))
     UI:Refresh()
   end, 2)
   UI.gameBtn = actionButton("Game: ?", 110, UI.hypeBtn, function()
@@ -243,6 +269,10 @@ local function build()
     ns:Print("New session started - session P&L zeroed (all-time ledger kept).")
     UI:Refresh()
   end)
+  UI.uoBtn = actionButton("U/O 7: OFF", 90, bSession, function()
+    if ns.UO.active then ns.UO:Stop() else ns.UO:Start() end
+    UI:Refresh()
+  end)
 end
 
 function UI:Refresh()
@@ -250,6 +280,9 @@ function UI:Refresh()
   if self.hypeBtn then
     self.hypeBtn:SetText("Bets: " .. (ns.db.channel == "CHANNEL" and "CUSTOM" or (ns.db.channel or "PARTY")))
     self.gameBtn:SetText("Game: " .. (ns.db.tableChannel or "PARTY"))
+  end
+  if self.uoBtn then
+    self.uoBtn:SetText(ns.UO.active and "U/O 7: ON" or "U/O 7: OFF")
   end
   -- highlight active tab
   for key, b in pairs(self.tabButtons) do

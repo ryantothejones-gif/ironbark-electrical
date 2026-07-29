@@ -203,7 +203,7 @@ function BJ:ResolveTiebreak(force)
     -- roll-off, so a hasty double-tap can't kill a roll-off nobody's had time
     -- to roll in yet.
     if force and tb.voidArmed then
-      ns:Announce("Nobody rolled - roll-off void, house keeps it!")
+      ns:Announce("Nobody rolled - roll-off void, house keeps it!", "hype")
       self.tiebreak = nil
       self:NextRound()
       if ns.UI then ns.UI:Refresh() end

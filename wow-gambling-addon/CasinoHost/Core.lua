@@ -301,7 +301,7 @@ end
 ns:AddCommand("channel", "<party|say|raid|guild|yell|channel NAME> - where BIG announcements go (bets, payouts, winners)", function(self, rest)
   local a, b = rest:match("^(%S+)%s*(.-)$")
   a = a and a:upper() or ""
-  local valid = { SAY = true, YELL = true, PARTY = true, RAID = true, GUILD = true, INSTANCE_CHAT = true }
+  local valid = { SAY = true, YELL = true, EMOTE = true, PARTY = true, RAID = true, GUILD = true, INSTANCE_CHAT = true }
   if a == "CHANNEL" then
     if b == "" then self:Print("Usage: /casino channel channel <ChannelName>") return end
     self.db.channel = "CHANNEL"
@@ -313,7 +313,7 @@ ns:AddCommand("channel", "<party|say|raid|guild|yell|channel NAME> - where BIG a
     self:Print("Announcing to " .. a)
   else
     self:Print("Current: " .. (self.db.channel == "CHANNEL" and ("channel " .. (self.db.channelName or "?")) or self.db.channel))
-    self:Print("Valid: party, say, raid, guild, yell, channel <name>")
+    self:Print("Valid: party, say, yell (red), emote (orange), raid, guild, channel <name>")
   end
 end)
 

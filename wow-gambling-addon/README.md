@@ -40,7 +40,18 @@ Ties go to a **roll-off**: the tied players each `/roll` once, highest wins,
 and a repeat tie just rolls again. If someone wanders off mid-roll-off,
 `/casino bj result` force-resolves it (no-shows forfeit).
 
-### 3. Points & redemptions
+### 3. Under/Over 7 (Worn Troll Dice)
+Arm the game (`/casino uo on` or the **U/O 7** button), then toss your **Worn
+Troll Dice** toy. The toy rolls two six-sided dice; CasinoHost reads both, sums
+them, and calls it for everyone:
+
+> Dice: 4 + 5 = 9 - OVER 7!
+
+Players bet UNDER (2-6), SEVEN (7), or OVER (8-12) by trading you gold like any
+other game, then you pay the winners. Only your own tosses count, and the game
+ignores stray rolls until you arm it.
+
+### 4. Points & redemptions
 Betting earns points (default: 1 point per gold bet, configurable). Players whisper
 you:
 
@@ -48,7 +59,7 @@ you:
 - `!redeem 100` -> deducts points and adds a redemption to your queue to fulfil.
 - `!help` -> lists the commands.
 
-### 4. Trade logger / P&L
+### 5. Trade logger / P&L
 Every gold trade is logged both ways: gold coming **in** (bets) and gold going
 **out** (payouts you trade back). The **P&L** tab shows session and all-time
 profit, plus a per-player breakdown of who's up and who's down against the house.
@@ -72,7 +83,8 @@ night; paid someone by mail instead of trade? `/casino payout <name> <gold>`.
 | `/casino bj stop` | Close the round (no more rolls) |
 | `/casino bj result` | Announce the winner (roll-off on ties) and open the next round |
 | `/casino bj clear` | Clear the table |
-| `/casino channel <party\|say\|raid\|guild\|yell\|channel NAME>` | Where BIG announcements go (bets, payouts, winners) |
+| `/casino uo <on\|off>` | Under/Over 7 dice game (toss your Worn Troll Dice) |
+| `/casino channel <party\|say\|yell\|emote\|raid\|guild\|channel NAME>` | Where BIG announcements go (bets, payouts, winners) |
 | `/casino gamechat <party\|say\|raid\|guild\|yell\|off>` | Where play-by-play goes (rolls, round opens, roll-offs) |
 | `/casino bindkey <key\|off>` | Keybind that fires the Announce button (e.g. `F8`) |
 | `/casino target <n>` | Blackjack target number (default 100) |
@@ -91,9 +103,15 @@ night; paid someone by mail instead of trade? `/casino payout <name> <gold>`.
 ## Announcing to everyone (not just your party)
 Announcements are split into two streams, each with its own channel:
 
-- **Big announcements** (bets, payouts, blackjack winners): `/casino channel say`
+- **Big announcements** (bets, payouts, winners, dice results): `/casino channel say`
 - **Play-by-play** (rolls, busts, round opens, roll-off mechanics):
   `/casino gamechat party` (or `off` to keep it host-only)
+
+Big announcements can go out as **red** (`/casino channel yell`) or **orange**
+(`/casino channel emote`) text like the old-school host macros. Yell needs the
+Announce button/F8 (Blizzard requires a click for say/yell); emote sends on its
+own with no click. Note emote is third-person, so it shows your name first,
+e.g. *"Ryan WINNER! Bob takes home 500g!"*.
 
 The classic casino setup is `channel say` + `gamechat party`: the crowd hears
 the money and the winners; the table hears the game. Both are also click-to-cycle
